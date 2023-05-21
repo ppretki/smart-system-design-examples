@@ -1,0 +1,74 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_USER: ssd
+      POSTGRES_PASSWORD: pssd
+      POSTGRES_DB: ssd_db
+    ports:
+      - "20000:5432"
+    networks:
+      - smart_system_design
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+
+  prometheus:
+    image: prom/prometheus
+    depends_on:
+      - postgres
+    ports:
+      - "20001:9090"
+    networks:
+      - smart_system_design
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+
+  zipkin:
+    image: openzipkin/zipkin-slim
+    environment:
+      - STORAGE_TYPE=mem
+    ports:
+      - "20002:9411"
+    networks:
+      - smart_system_design
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - postgres_exporter
+    ports:
+      - "20003:3000"
+    restart: unless-stopped
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - grafana-data:/var/lib/grafana
+    networks:
+      - smart_system_design
+
+  postgres_exporter:
+    image: bitnami/postgres-exporter:latest
+    depends_on:
+      - postgres
+    environment:
+      DATA_SOURCE_NAME: postgresql://ssd@pssd:5432/ssd_db?sslmode=disable
+    ports:
+      - "20004:9187"
+    networks:
+      - smart_system_design
+
+networks:
+  smart_system_design:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  pgdata:
+  grafana-data:
